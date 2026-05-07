@@ -1,7 +1,7 @@
 package main
 
 import (
-	"os"
+	"log"
 
 	"github.com/Dr3iundZwanzig/BlogAggregator/internal/config"
 )
@@ -9,25 +9,20 @@ import (
 func main() {
 	configStruct, err := config.Read()
 	if err != nil {
-		println(err)
-		println("error reading")
-		os.Exit(0)
+		log.Fatal(err)
 	}
-
-	err = configStruct.SetUser("Sven")
+	st := &state{
+		config: &configStruct,
+	}
+	commandsStruct := commands{
+		commandMap: map[string]func(*state, command) error{},
+	}
+	err = commandsStruct.register("login", handlerLogin)
 	if err != nil {
-		println(err)
-		println("error setting user")
-		os.Exit(0)
+		log.Fatal(err)
 	}
-
-	configStruct, err = config.Read()
+	err = cli(st, commandsStruct)
 	if err != nil {
-		println(err)
-		println("error reading")
-		os.Exit(0)
+		log.Fatal(err)
 	}
-	println("ConfigData:")
-	println(*configStruct.CurrentUserName)
-	println(configStruct.DbURL)
 }
