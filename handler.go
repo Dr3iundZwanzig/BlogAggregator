@@ -105,6 +105,81 @@ func handlerAddFeed(s *state, cmd command) error {
 	if err != nil {
 		return fmt.Errorf("error creating feed")
 	}
-	fmt.Println(newFeed)
+	printFeed(newFeed)
+	cmd.arguments[0] = newFeed.Url
+	err = handlerFollow(s, cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func handlerFeeds(s *state, cmd command) error {
+	feeds, err := s.db.GetFeeds(context.Background())
+	if err != nil {
+		return fmt.Errorf("error getting feeds")
+	}
+	for _, feed := range feeds {
+		printFeed(feed)
+		feedCreator, err := s.db.GetUserFromId(context.Background(), feed.UsersID)
+		if err != nil {
+			return fmt.Errorf("error getting user by id")
+		}
+		fmt.Printf("* Feed creator:	 %s\n", feedCreator.Name)
+	}
+	return nil
+}
+
+func printFeed(feed database.Feed) {
+	fmt.Printf("* ID:            %s\n", feed.ID)
+	fmt.Printf("* Created:       %v\n", feed.CreatedAt)
+	fmt.Printf("* Updated:       %v\n", feed.UpdatedAt)
+	fmt.Printf("* Name:          %s\n", feed.Name)
+	fmt.Printf("* URL:           %s\n", feed.Url)
+	fmt.Printf("* UserID:        %s\n", feed.UsersID)
+}
+
+func handlerFollow(s *state, cmd command) error {
+	if len(cmd.arguments) == 0 {
+		return fmt.Errorf("no argument for command found")
+	}
+	currentUser, err := s.db.GetUser(context.Background(), s.config.CurrentUserName)
+	if err != nil {
+		return fmt.Errorf("error getting current user")
+	}
+	feed, err := s.db.GetFeedByUrl(context.Background(), cmd.arguments[0])
+	if err != nil {
+		return fmt.Errorf("error getting feed from url")
+	}
+
+	currentTime := time.Now().UTC()
+	feedFollow := database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: currentTime,
+		UpdatedAt: currentTime,
+		UsersID:   currentUser.ID,
+		FeedID:    feed.ID,
+	}
+	createdFeedFollow, err := s.db.CreateFeedFollow(context.Background(), feedFollow)
+	if err != nil {
+		return fmt.Errorf("error creating feed follow")
+	}
+	fmt.Println(createdFeedFollow.UserName)
+	fmt.Println(createdFeedFollow.FeedName)
+	return nil
+}
+
+func handlerFollowing(s *state, cmd command) error {
+	currentUser, err := s.db.GetUser(context.Background(), s.config.CurrentUserName)
+	if err != nil {
+		return fmt.Errorf("error getting current user")
+	}
+	follows, err := s.db.GetFeedFollowsForUser(context.Background(), currentUser.ID)
+	if err != nil {
+		return fmt.Errorf("error getting follows: %v", err)
+	}
+	for _, follow := range follows {
+		fmt.Println(follow.FeedName)
+	}
 	return nil
 }

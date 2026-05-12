@@ -30,6 +30,9 @@ func main() {
 	commandsStruct.register("users", handlerUsers)
 	commandsStruct.register("agg", handlerAgg)
 	commandsStruct.register("addfeed", handlerAddFeed)
+	commandsStruct.register("feeds", handlerFeeds)
+	commandsStruct.register("follow", handlerFollow)
+	commandsStruct.register("following", handlerFollowing)
 
 	err = cli(st, commandsStruct)
 	if err != nil {
