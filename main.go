@@ -29,10 +29,11 @@ func main() {
 	commandsStruct.register("reset", handlerReset)
 	commandsStruct.register("users", handlerUsers)
 	commandsStruct.register("agg", handlerAgg)
-	commandsStruct.register("addfeed", handlerAddFeed)
+	commandsStruct.register("addfeed", middlewareLoggedIn(handlerAddFeed))
 	commandsStruct.register("feeds", handlerFeeds)
-	commandsStruct.register("follow", handlerFollow)
-	commandsStruct.register("following", handlerFollowing)
+	commandsStruct.register("follow", middlewareLoggedIn(handlerFollow))
+	commandsStruct.register("following", middlewareLoggedIn(handlerFollowing))
+	commandsStruct.register("unfollow", middlewareLoggedIn(handlerUnfollow))
 
 	err = cli(st, commandsStruct)
 	if err != nil {
