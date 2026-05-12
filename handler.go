@@ -29,7 +29,7 @@ func handlerRegister(s *state, cmd command) error {
 	if len(cmd.arguments) == 0 {
 		return fmt.Errorf("no argument for command found")
 	}
-	currentTime := time.Now()
+	currentTime := time.Now().UTC()
 	User := database.CreateUserParams{
 		ID:        uuid.New(),
 		CreatedAt: currentTime,
@@ -68,5 +68,43 @@ func handlerUsers(s *state, cmd command) error {
 		}
 		fmt.Printf("* %v\n", userName)
 	}
+	return nil
+}
+
+func handlerAgg(s *state, cmd command) error {
+	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return fmt.Errorf("error fetching feed")
+	}
+	fmt.Println(feed)
+	return nil
+}
+
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.arguments) == 0 {
+		return fmt.Errorf("no argument for command found")
+	}
+	if len(cmd.arguments) < 2 {
+		return fmt.Errorf("need more arguments: name and url")
+	}
+
+	currentUser, err := s.db.GetUser(context.Background(), s.config.CurrentUserName)
+	if err != nil {
+		return fmt.Errorf("error getting current user")
+	}
+	currentTime := time.Now().UTC()
+	feed := database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: currentTime,
+		UpdatedAt: currentTime,
+		Name:      cmd.arguments[0],
+		Url:       cmd.arguments[1],
+		UsersID:   currentUser.ID,
+	}
+	newFeed, err := s.db.CreateFeed(context.Background(), feed)
+	if err != nil {
+		return fmt.Errorf("error creating feed")
+	}
+	fmt.Println(newFeed)
 	return nil
 }

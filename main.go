@@ -28,6 +28,8 @@ func main() {
 	commandsStruct.register("register", handlerRegister)
 	commandsStruct.register("reset", handlerReset)
 	commandsStruct.register("users", handlerUsers)
+	commandsStruct.register("agg", handlerAgg)
+	commandsStruct.register("addfeed", handlerAddFeed)
 
 	err = cli(st, commandsStruct)
 	if err != nil {
