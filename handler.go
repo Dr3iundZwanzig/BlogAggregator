@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/Dr3iundZwanzig/BlogAggregator/internal/database"
@@ -72,12 +74,29 @@ func handlerUsers(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
-	if err != nil {
-		return fmt.Errorf("error fetching feed")
+	if len(cmd.arguments) == 0 {
+		return fmt.Errorf("no argument for command found")
 	}
-	fmt.Println(feed)
-	return nil
+	timeBetweenRequests, err := time.ParseDuration(cmd.arguments[0])
+	if err != nil {
+		return fmt.Errorf("error invalid time argument")
+	}
+	time_req, err := time.ParseDuration("5s")
+	if err != nil {
+		return fmt.Errorf("error invalid internal time argument")
+	}
+	if timeBetweenRequests < time_req {
+		return fmt.Errorf("minimum time is 10s between requests")
+	}
+
+	fmt.Printf("Collectionf feeds every: %v\n", timeBetweenRequests)
+	ticker := time.NewTicker(timeBetweenRequests)
+	for ; ; <-ticker.C {
+		err = scrapeFeeds(s)
+		if err != nil {
+			return err
+		}
+	}
 }
 
 func handlerAddFeed(s *state, cmd command, currentUser database.User) error {
@@ -97,9 +116,12 @@ func handlerAddFeed(s *state, cmd command, currentUser database.User) error {
 		ID:        uuid.New(),
 		CreatedAt: currentTime,
 		UpdatedAt: currentTime,
-		Name:      cmd.arguments[0],
-		Url:       cmd.arguments[1],
-		UsersID:   currentUser.ID,
+		LastFetchedAt: sql.NullTime{
+			Valid: false,
+		},
+		Name:    cmd.arguments[0],
+		Url:     cmd.arguments[1],
+		UsersID: currentUser.ID,
 	}
 	newFeed, err := s.db.CreateFeed(context.Background(), feed)
 	if err != nil {
@@ -178,6 +200,9 @@ func handlerFollowing(s *state, cmd command, currentUser database.User) error {
 }
 
 func handlerUnfollow(s *state, cmd command, currentUser database.User) error {
+	if len(cmd.arguments) == 0 {
+		return fmt.Errorf("no argument for command found")
+	}
 	feed, err := s.db.GetFeedByUrl(context.Background(), cmd.arguments[0])
 	if err != nil {
 		return fmt.Errorf("error getting feed")
@@ -191,5 +216,28 @@ func handlerUnfollow(s *state, cmd command, currentUser database.User) error {
 		return fmt.Errorf("error unfollowing feed")
 	}
 	fmt.Printf("Unfollowed: %v with user: %v\n", feed.Name, currentUser.Name)
+	return nil
+}
+
+func handlerBrowse(s *state, cmd command, currentUser database.User) error {
+	limit := 2
+	if len(cmd.arguments) > 0 {
+		input, err := strconv.Atoi(cmd.arguments[0])
+		if err != nil {
+			return fmt.Errorf("invalid limit input: %v", cmd.arguments[0])
+		}
+		limit = input
+	}
+	param := database.GetPostsForUserParams{
+		UsersID: currentUser.ID,
+		Limit:   int32(limit),
+	}
+	userPosts, err := s.db.GetPostsForUser(context.Background(), param)
+	if err != nil {
+		return fmt.Errorf("error getting user posts")
+	}
+	for _, p := range userPosts {
+		fmt.Println(p.Title)
+	}
 	return nil
 }

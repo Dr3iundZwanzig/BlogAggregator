@@ -34,6 +34,7 @@ func main() {
 	commandsStruct.register("follow", middlewareLoggedIn(handlerFollow))
 	commandsStruct.register("following", middlewareLoggedIn(handlerFollowing))
 	commandsStruct.register("unfollow", middlewareLoggedIn(handlerUnfollow))
+	commandsStruct.register("browse", middlewareLoggedIn(handlerBrowse))
 
 	err = cli(st, commandsStruct)
 	if err != nil {

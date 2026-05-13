@@ -2,10 +2,17 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/xml"
+	"fmt"
 	"html"
 	"io"
 	"net/http"
+	"strings"
+	"time"
+
+	"github.com/Dr3iundZwanzig/BlogAggregator/internal/database"
+	"github.com/google/uuid"
 )
 
 type RSSFeed struct {
@@ -62,4 +69,64 @@ func helperUnescapeString(feed *RSSFeed) *RSSFeed {
 		feed.Channel.Item[i].Description = html.UnescapeString(item.Description)
 	}
 	return feed
+}
+
+func scrapeFeeds(s *state) error {
+	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		return fmt.Errorf("error getting next feed to fetch")
+	}
+
+	currentTime := time.Now().UTC()
+	mark := database.MarkFeedFetchedParams{
+		ID: nextFeed.ID,
+		LastFetchedAt: sql.NullTime{
+			Time:  currentTime,
+			Valid: true,
+		},
+		UpdatedAt: currentTime,
+	}
+	err = s.db.MarkFeedFetched(context.Background(), mark)
+	if err != nil {
+		return fmt.Errorf("error marking feed: %v", err)
+	}
+
+	fetchedFeed, err := fetchFeed(context.Background(), nextFeed.Url)
+	if err != nil {
+		return fmt.Errorf("Error fetching feed")
+	}
+
+	for _, item := range fetchedFeed.Channel.Item {
+		description := sql.NullString{
+			Valid: false,
+		}
+		fmt.Println(item.PubDate)
+		published, err := time.Parse(time.RFC1123, item.PubDate)
+		if err != nil {
+			return fmt.Errorf("error parsing puplish date: %v", err)
+		}
+		if item.Description != "" {
+			description.Valid = true
+			description.String = item.Description
+		}
+		postParam := database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   currentTime,
+			UpdatedAt:   currentTime,
+			Title:       item.Title,
+			Url:         item.Link,
+			Description: description,
+			PublishedAt: published,
+			FeedID:      nextFeed.ID,
+		}
+		newPost, err := s.db.CreatePost(context.Background(), postParam)
+		if err != nil {
+			if !strings.Contains(err.Error(), "posts_url_key") {
+				return fmt.Errorf("error ceating post: %v", err)
+			}
+
+		}
+		fmt.Printf("post createt: %v", newPost.Title)
+	}
+	return nil
 }
